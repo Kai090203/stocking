@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coin Trader Pro - Security</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        /* --- 기본 스타일 --- */
+        body { background-color: #f0f2f5; color: #333; font-family: 'Pretendard', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
+        
+        /* --- 로그인 화면 (업데이트됨) --- */
+        #loginScreen { position: absolute; z-index: 1000; background: rgba(255,255,255,0.98); width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); text-align: center; width: 320px; border: 1px solid #e1e4e8; }
+        .login-title { font-size: 1.8rem; font-weight: 800; color: #2f3542; margin: 0 0 10px 0; }
+        .login-desc { color: #747d8c; margin-bottom: 25px; font-size: 0.95rem; }
+        .login-input { width: 100%; padding: 14px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; transition: 0.2s; }
+        .login-input:focus { border-color: #333; }
+        .btn-login { width: 100%; padding: 14px; background: #2f3542; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.2s; margin-top: 10px; }
+        .btn-login:hover { background: #57606f; }
+        .login-msg { margin-top: 15px; font-size: 0.85rem; color: #ff4757; min-height: 20px; }
+
+        /* --- 뉴스바 --- */
+        .news-container { position: absolute; top: 0; width: 100%; background: #fff; height: 50px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .news-badge { padding: 4px 10px; border-radius: 20px; color: white; font-size: 0.8rem; font-weight: bold; margin-right: 10px; }
+        .badge-red { background: #ff4757; } .badge-blue { background: #1e90ff; } .badge-gray { background: #747d8c; }
+        #newsText { font-weight: 600; font-size: 1rem; color: #2f3542; }
+
+        /* --- 메인 UI --- */
+        .main-container { display: none; gap: 20px; width: 95%; max-width: 1100px; height: 85vh; margin-top: 60px; }
+        .panel { background: white; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e1e4e8; }
+        
+        /* 왼쪽 (차트/매매) */
+        .left-panel { flex: 1.8; padding: 25px; position: relative; }
+        .coin-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
+        .coin-name-big { font-size: 2rem; font-weight: 800; color: #2f3542; }
+        .coin-price-big { font-size: 2.4rem; font-weight: 900; }
+        .price-up { color: #ff4757; } .price-down { color: #1e90ff; }
+        
+        #chartArea { width: 100%; height: 380px; border: 1px solid #eee; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+        
+        .trade-area { background: #f8f9fa; padding: 20px; border-radius: 12px; }
+        .asset-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem; color: #57606f; }
+        .asset-val { font-weight: bold; color: #2f3542; font-size: 1.1rem; }
+        
+        .input-row { display: flex; gap: 10px; margin-bottom: 15px; margin-top: 15px; }
+        .qty-input { flex: 1; padding: 14px; border: 1px solid #ced6e0; border-radius: 8px; font-size: 1.2rem; text-align: right; outline: none; font-weight: bold; }
+        .btn-max { padding: 0 20px; background: #a4b0be; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        .btn-row { display: flex; gap: 10px; }
+        .btn-trade { flex: 1; padding: 16px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; color: white; cursor: pointer; transition: 0.1s; }
+        .btn-buy { background: #ff4757; box-shadow: 0 4px 0 #d63031; } .btn-buy:active { transform: translateY(4px); box-shadow: none; }
+        .btn-sell { background: #1e90ff; box-shadow: 0 4px 0 #0984e3; } .btn-sell:active { transform: translateY(4px); box-shadow: none; }
+
+        /* 오른쪽 (리스트) */
+        .right-panel { flex: 1; display: flex; flex-direction: column; background: #fdfdfd; }
+        .tab-header { display: flex; border-bottom: 1px solid #eee; }
+        .tab-btn { flex: 1; padding: 15px; cursor: pointer; text-align: center; font-weight: bold; color: #a4b0be; transition: 0.2s; background: #f1f2f6; }
+        .tab-btn.active { background: white; color: #2f3542; border-top: 3px solid #333; }
+        
+        .list-container { flex: 1; overflow-y: auto; }
+        .coin-item { padding: 15px 20px; border-bottom: 1px solid #f1f2f6; cursor: pointer; transition: 0.1s; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .coin-item:hover { background: #f8f9fa; }
+        .coin-item.active { background: #eef2f5; border-left: 5px solid #2f3542; }
+        
+        .coin-info-left { display: flex; flex-direction: column; }
+        .code-tag { font-size: 0.8rem; color: #a4b0be; font-weight: bold; }
+        .name-tag { font-weight: bold; font-size: 1.05rem; color: #2f3542; }
+        
+        .coin-info-right { text-align: right; }
+        .list-price { font-weight: bold; font-size: 1.05rem; }
+        .list-pct { font-size: 0.9rem; font-weight: bold; margin-top: 4px; }
+        
+        .holding-badge { background: #2ed573; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+        .profit-pos { color: #ff4757; } .profit-neg { color: #1e90ff; }
+
+        /* 토스트 */
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 30px; font-size: 0.9rem; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 2000; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h2 class="login-title">🔐 Coin Trader</h2>
+        <p class="login-desc">아이디와 비밀번호를 입력하세요.<br>(처음 입력 시 자동 가입)</p>
+        
+        <input type="text" id="username" class="login-input" placeholder="아이디 (ID)" onkeypress="if(event.key==='Enter') document.getElementById('password').focus()">
+        <input type="password" id="password" class="login-input" placeholder="비밀번호 (Password)" onkeypress="if(event.key==='Enter') tryLogin()">
+        
+        <button class="btn-login" onclick="tryLogin()">접속하기</button>
+        <div id="loginMsg" class="login-msg"></div>
+    </div>
+</div>
+
+<div class="news-container">
+    <div id="newsBadge" class="news-badge badge-gray">NEWS</div>
+    <div id="newsText">글로벌 마켓 데이터 연결 중...</div>
+    <button onclick="logout()" style="position:absolute; right:20px; padding:6px 12px; border:1px solid #ddd; background:white; cursor:pointer; border-radius:4px; font-weight:bold; color:#555;">로그아웃</button>
+</div>
+
+<div class="main-container" id="mainGame">
+    <div class="panel left-panel">
+        <div class="coin-header">
+            <div>
+                <span class="code-tag" id="mainCode">BTC</span>
+                <div class="coin-name-big" id="mainName">비트코인</div>
+            </div>
+            <div class="coin-price-big" id="mainPrice">0</div>
+        </div>
+
+        <div id="chartArea"></div>
+
+        <div class="trade-area">
+            <div class="asset-row">
+                <span>내 예수금</span>
+                <span class="asset-val"><span id="myCash">0</span> KRW</span>
+            </div>
+            <div class="asset-row">
+                <span>보유 수량</span>
+                <span class="asset-val"><span id="myQty">0</span> <span id="qtyUnit">BTC</span></span>
+            </div>
+            
+            <div class="input-row">
+                <input type="number" id="tradeAmount" class="qty-input" placeholder="수량 입력">
+                <button class="btn-max" onclick="setMax()">최대</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn-trade btn-buy" onclick="trade('buy')">매수</button>
+                <button class="btn-trade btn-sell" onclick="trade('sell')">매도</button>
+            </div>
+            <div style="text-align:center; margin-top:15px; color:#747d8c; font-size:0.9rem;">
+                총 자산 평가: <b id="totalAsset" style="color:#333">0</b> KRW
+            </div>
+        </div>
+    </div>
+
+    <div class="panel right-panel">
+        <div class="tab-header">
+            <div class="tab-btn active" id="tabAll" onclick="switchTab('all')">🌐 전체 시세</div>
+            <div class="tab-btn" id="tabMy" onclick="switchTab('my')">💼 내 지갑</div>
+        </div>
+        <div class="list-container" id="coinList"></div>
+    </div>
+</div>
+
+<div id="toast">메시지</div>
+
+<script>
+    // --- 데이터 (변동성 Volatility 기존 대비 상향 조정) ---
+    const coinDb = [
+        { code: "BTC", name: "비트코인", price: 98500000, vol: 0.8 },
+        { code: "ETH", name: "이더리움", price: 5200000, vol: 1.0 },
+        { code: "XRP", name: "리플", price: 900, vol: 1.5 },
+        { code: "SOL", name: "솔라나", price: 210000, vol: 1.4 },
+        { code: "BNB", name: "바이낸스", price: 850000, vol: 0.9 },
+        { code: "DOGE", name: "도지코인", price: 220, vol: 3.0 }, // 밈코인 변동성 큼
+        { code: "ADA", name: "에이다", price: 750, vol: 1.2 },
+        { code: "TRX", name: "트론", price: 160, vol: 1.0 },
+        { code: "AVAX", name: "아발란체", price: 48000, vol: 1.5 },
+        { code: "SHIB", name: "시바이누", price: 0.04, vol: 4.0 }, // 초고위험
+        { code: "DOT", name: "폴카닷", price: 11000, vol: 1.4 },
+        { code: "LINK", name: "체인링크", price: 25000, vol: 1.6 },
+        { code: "MATIC", name: "폴리곤", price: 1100, vol: 1.5 },
+        { code: "LTC", name: "라이트코인", price: 115000, vol: 1.1 },
+        { code: "BCH", name: "비트캐시", price: 650000, vol: 1.2 },
+        { code: "UNI", name: "유니스왑", price: 9500, vol: 1.8 },
+        { code: "ETC", name: "이클", price: 32000, vol: 2.0 },
+        { code: "XLM", name: "스텔라", price: 190, vol: 1.3 },
+        { code: "SAND", name: "샌드박스", price: 850, vol: 2.2 },
+        { code: "PEPE", name: "페페", price: 0.008, vol: 5.0 } // 극악 난이도
+    ];
+
+    const newsData = [
+        { type: 'good', text: "{name}, 대기업 결제 도입 확정!", power: 1.12 }, // 12% 상승
+        { type: 'good', text: "기관, {name} 1조원 매수 포착", power: 1.08 },
+        { type: 'good', text: "{name}, 메인넷 성공적 런칭", power: 1.06 },
+        { type: 'good', text: "미국 SEC, {name} ETF 승인!", power: 1.15 }, // 15% 상승
+        { type: 'bad', text: "{name} 재단, 먹튀 논란 발생", power: 0.85 }, // 15% 하락
+        { type: 'bad', text: "해커, {name} 대량 탈취 성공", power: 0.88 },
+        { type: 'bad', text: "거래소, {name} 상장폐지 심사", power: 0.80 }, // 20% 하락
+        { type: 'bad', text: "규제 당국, {name} 증권성 판정", power: 0.90 },
+        { type: 'info', text: "나스닥 급등, 코인 시장 훈풍", power: 1.03 },
+        { type: 'info', text: "FOMC 금리 인상 공포 확산", power: 0.97 }
+    ];
+
+    // 상태 변수
+    let currentUser = "";
+    let cash = 10000000;
+    let coins = [];
+    let wallet = {};
+    let curIdx = 0;
+    let curTab = 'all';
+    
+    // 차트
+    let chart, series;
+    let chartData = [];
+    let lastTime = Math.floor(Date.now()/1000);
+    let loopId;
+
+    // --- 로그인 로직 (비번 기능 추가) ---
+    function tryLogin() {
+        const id = document.getElementById("username").value.trim();
+        const pw = document.getElementById("password").value.trim();
+        const msg = document.getElementById("loginMsg");
+        
+        if(!id || !pw) {
+            msg.innerText = "아이디와 비밀번호를 모두 입력해주세요.";
+            return;
+        }
+
+        // 유저 DB 로드 (전체 유저 비번 저장용)
+        let userDB = JSON.parse(localStorage.getItem("btcGame_Users") || "{}");
+
+        if(userDB.hasOwnProperty(id)) {
+            // 기존 유저
+            if(userDB[id] === pw) {
+                gameStart(id);
+            } else {
+                msg.innerText = "비밀번호가 틀렸습니다.";
+            }
+        } else {
+            // 신규 유저 -> 자동 가입
+            userDB[id] = pw;
+            localStorage.setItem("btcGame_Users", JSON.stringify(userDB));
+            alert(`환영합니다, ${id}님!\n입력하신 비밀번호로 계정이 생성되었습니다.`);
+            gameStart(id);
+        }
+    }
+
+    function gameStart(id) {
+        currentUser = id;
+        
+        // 개별 유저 게임 데이터 로드
+        const saved = localStorage.getItem("btcGame_Data_" + currentUser);
+        if(saved) {
+            const data = JSON.parse(saved);
+            cash = data.cash;
+            wallet = data.wallet;
+            // 코인 데이터 병합 (새로운 코인이 추가됐을 경우 대비)
+            coins = coinDb.map(init => {
+                const found = data.coins.find(c => c.code === init.code);
+                return found ? found : { ...init, openPrice: init.price };
+            });
+        } else {
+            // 초기화
+            cash = 10000000;
+            wallet = {};
+            coins = JSON.parse(JSON.stringify(coinDb));
+            coins.forEach(c => {
+                c.openPrice = c.price; 
+                wallet[c.code] = { qty: 0, avg: 0 };
+            });
+        }
+
+        document.getElementById("loginScreen").style.display = 'none';
+        document.getElementById("mainGame").style.display = 'flex';
+        
+        initChart();
+        changeCoin(0);
+        
+        if(loopId) clearInterval(loopId);
+        loopId = setInterval(gameLoop, 1000); 
+    }
+
+    function logout() {
+        save();
+        location.reload();
+    }
+
+    // --- 차트 엔진 ---
+    function initChart() {
+        const el = document.getElementById("chartArea");
+        chart = LightweightCharts.createChart(el, {
+            layout: { background: { color: '#ffffff' }, textColor: '#333' },
+            grid: { vertLines: { color: '#f0f0f0' }, horzLines: { color: '#f0f0f0' } },
+            timeScale: { timeVisible: true, secondsVisible: false },
+            rightPriceScale: { borderVisible: false },
+        });
+        series = chart.addCandlestickSeries({
+            upColor: '#ff4757', downColor: '#1e90ff',
+            borderUpColor: '#ff4757', borderDownColor: '#1e90ff',
+            wickUpColor: '#ff4757', wickDownColor: '#1e90ff',
+        });
+        
+        new ResizeObserver(entries => {
+            if(entries.length) chart.applyOptions({ width: entries[0].contentRect.width, height: entries[0].contentRect.height });
+        }).observe(el);
+    }
+
+    function resetChartData() {
+        chartData = [];
+        let c = coins[curIdx];
+        let p = c.price;
+        let t = lastTime - 60*60;
+        
+        for(let i=0; i<60; i++) {
+            let open = p;
+            // 과거 차트도 변동성 반영
+            let move = (Math.random()-0.5) * 0.01 * c.vol; 
+            let close = open * (1 + move);
+            let high = Math.max(open, close) + (open*0.003);
+            let low = Math.min(open, close) - (open*0.003);
+            chartData.push({ time: t, open, high, low, close });
+            p = close;
+            t += 60;
+        }
+        lastTime = t;
+        chartData[chartData.length-1].close = c.price;
+        series.setData(chartData);
+    }
+
+    // --- 게임 루프 (등락폭 상향) ---
+    function gameLoop() {
+        // 1. 뉴스 이벤트 (확률 5% -> 강도 증가)
+        if(Math.random() < 0.05) {
+            triggerNews();
+        }
+
+        // 2. 가격 변동 (기존 0.006 -> 0.012 로 2배 상향)
+        coins.forEach(c => {
+            let drift = (Math.random() - 0.5) * 0.012 * c.vol;
+            c.price = c.price * (1 + drift);
+            if(c.price < 0.000001) c.price = 0.000001; 
+        });
+
+        // 3. 차트 업데이트
+        let cur = coins[curIdx];
+        let now = Math.floor(Date.now()/1000);
+        let last = chartData[chartData.length-1];
+
+        if(now - lastTime >= 5) {
+            lastTime = now;
+            let nc = { time: lastTime, open: cur.price, high: cur.price, low: cur.price, close: cur.price };
+            chartData.push(nc);
+            series.update(nc);
+        } else {
+            last.close = cur.price;
+            last.high = Math.max(last.high, cur.price);
+            last.low = Math.min(last.low, cur.price);
+            series.update(last);
+        }
+
+        updateInfo();
+        renderList();
+        save();
+    }
+
+    function triggerNews() {
+        const news = newsData[Math.floor(Math.random() * newsData.length)];
+        const targetIdx = Math.floor(Math.random() * coins.length);
+        const targetCoin = coins[targetIdx];
+        
+        let msg = news.text.replace("{name}", targetCoin.name);
+        
+        if(news.type === 'info') {
+            coins.forEach(c => c.price *= news.power);
+        } else {
+            targetCoin.price *= news.power;
+        }
+
+        let badgeClass = news.type === 'good' ? 'badge-red' : (news.type === 'bad' ? 'badge-blue' : 'badge-gray');
+        let badgeText = news.type === 'good' ? '호재' : (news.type === 'bad' ? '악재' : '뉴스');
+
+        const badge = document.getElementById('newsBadge');
+        const text = document.getElementById('newsText');
+        
+        text.style.opacity = 0;
+        setTimeout(() => {
+            badge.className = "news-badge " + badgeClass;
+            badge.innerText = badgeText;
+            text.innerText = msg;
+            text.style.opacity = 1;
+        }, 300);
+    }
+
+    // --- UI 로직 ---
+    function updateInfo() {
+        const c = coins[curIdx];
+        document.getElementById("mainCode").innerText = c.code;
+        document.getElementById("mainName").innerText = c.name;
+        
+        const pEl = document.getElementById("mainPrice");
+        const diff = c.price - c.openPrice;
+        pEl.innerText = fmt(c.price);
+        pEl.className = "coin-price-big " + (diff >= 0 ? "price-up" : "price-down");
+
+        document.getElementById("myCash").innerText = Math.floor(cash).toLocaleString();
+        document.getElementById("qtyUnit").innerText = c.code;
+        
+        const myW = wallet[c.code];
+        document.getElementById("myQty").innerText = myW ? myW.qty.toFixed(4) : "0";
+
+        let total = cash;
+        coins.forEach(x => {
+            if(wallet[x.code]) total += wallet[x.code].qty * x.price;
+        });
+        document.getElementById("totalAsset").innerText = Math.floor(total).toLocaleString();
+    }
+
+    function switchTab(t) {
+        curTab = t;
+        document.getElementById("tabAll").className = t==='all' ? "tab-btn active" : "tab-btn";
+        document.getElementById("tabMy").className = t==='my' ? "tab-btn active" : "tab-btn";
+        renderList();
+    }
+
+    function renderList() {
+        const listEl = document.getElementById("coinList");
+        listEl.innerHTML = "";
+
+        let targets = coins.map((c, i) => ({...c, idx: i}));
+        if(curTab === 'my') {
+            targets = targets.filter(c => wallet[c.code] && wallet[c.code].qty > 0);
+        }
+
+        if(targets.length === 0) {
+            listEl.innerHTML = "<div style='padding:30px; text-align:center; color:#ccc'>보유한 코인이 없습니다.</div>";
+            return;
+        }
+
+        targets.forEach(c => {
+            const div = document.createElement("div");
+            div.className = "coin-item" + (c.idx === curIdx ? " active" : "");
+            div.onclick = () => changeCoin(c.idx);
+
+            const pct = ((c.price - c.openPrice) / c.openPrice) * 100;
+            const color = pct >= 0 ? "price-up" : "price-down";
+            const sign = pct >= 0 ? "+" : "";
+            const hasQty = wallet[c.code] && wallet[c.code].qty > 0;
+            const badgeHtml = hasQty ? "<span class='holding-badge'>보유</span>" : "";
+
+            let html = `
+                <div class="coin-info-left">
+                    <span class="name-tag">${c.name} ${badgeHtml}</span>
+                    <span class="code-tag">${c.code}</span>
+                </div>
+                <div class="coin-info-right">
+                    <div class="list-price">${fmt(c.price)}</div>
+                    <div class="list-pct ${color}">${sign}${pct.toFixed(2)}%</div>
+                </div>
+            `;
+            
+            if(curTab === 'my') {
+                const w = wallet[c.code];
+                const profit = (c.price * w.qty) - (w.avg * w.qty);
+                const profitRate = w.avg > 0 ? (profit / (w.avg * w.qty)) * 100 : 0;
+                const pColor = profit >= 0 ? "profit-pos" : "profit-neg";
+                
+                html += `
+                <div style="width:100%; margin-top:8px; padding-top:8px; border-top:1px dashed #eee; display:flex; justify-content:space-between; font-size:0.85rem;">
+                    <span style="color:#777">평단: ${fmt(w.avg)}</span>
+                    <span class="${pColor}">수익: ${Math.floor(profit).toLocaleString()} (${profitRate.toFixed(1)}%)</span>
+                </div>
+                `;
+            }
+
+            div.innerHTML = html;
+            listEl.appendChild(div);
+        });
+    }
+
+    function changeCoin(idx) {
+        if(curIdx === idx) return;
+        curIdx = idx;
+        document.getElementById("tradeAmount").value = "";
+        resetChartData();
+        updateInfo();
+        renderList();
+    }
+
+    function setMax() {
+        const c = coins[curIdx];
+        const val = Math.floor((cash / c.price) * 10000) / 10000;
+        document.getElementById("tradeAmount").value = val > 0 ? val : 0;
+    }
+
+    function trade(type) {
+        const qty = parseFloat(document.getElementById("tradeAmount").value);
+        if(!qty || qty <= 0) return toast("수량을 확인해주세요.");
+        
+        const c = coins[curIdx];
+        const amt = qty * c.price;
+        const w = wallet[c.code];
+
+        if(type === 'buy') {
+            if(cash < amt) return toast("예수금이 부족합니다.");
+            cash -= amt;
+            const oldTotal = w.qty * w.avg;
+            const newTotal = oldTotal + amt;
+            w.qty += qty;
+            w.avg = newTotal / w.qty;
+            toast(`${c.name} 매수 완료`);
+        } else {
+            if(w.qty < qty) return toast("코인이 부족합니다.");
+            w.qty -= qty;
+            cash += amt;
+            if(w.qty <= 0.000001) { w.qty = 0; w.avg = 0; }
+            toast(`${c.name} 매도 완료`);
+        }
+        
+        save();
+        updateInfo();
+        renderList();
+    }
+
+    function save() {
+        if(!currentUser) return;
+        localStorage.setItem("btcGame_Data_" + currentUser, JSON.stringify({ cash, coins, wallet }));
+    }
+
+    function fmt(p) {
+        if(p < 1) return p.toFixed(4);
+        if(p < 1000) return p.toFixed(2);
+        return Math.floor(p).toLocaleString();
+    }
+
+    function toast(msg) {
+        const t = document.getElementById("toast");
+        t.innerText = msg;
+        t.style.opacity = 1;
+        t.style.bottom = "50px";
+        setTimeout(() => {
+            t.style.opacity = 0;
+            t.style.bottom = "30px";
+        }, 2000);
+    }
+
+</script>
+</body>
+</html>
